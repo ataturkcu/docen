@@ -117,7 +117,7 @@ body {
     height: 36px;
     padding: 8px;
     background: transparent;
-    border: 1px solid var(--docen-sidebar-border);
+    border: none;
     color: var(--docen-text);
     border-radius: var(--docen-radius);
     cursor: pointer;
@@ -129,9 +129,23 @@ body {
     background: var(--docen-sidebar-border);
 }
 
-.theme-toggle-btn svg, .github-btn svg {
-    width: 18px;
-    height: 18px;
+.theme-toggle-btn svg, .github-btn .github-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+/* GitHub Icon Theme Toggle */
+.github-icon-dark {
+    display: none;
+}
+
+[data-theme="dark"] .github-icon-light {
+    display: none;
+}
+
+[data-theme="dark"] .github-icon-dark {
+    display: block;
 }
 
 .docen-content {
