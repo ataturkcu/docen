@@ -12,6 +12,101 @@ class Docen {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+
+        // Enable developer mode
+        if (docenConfig.developerMode) {
+            this.enableDeveloperMode();
+        }
+    }
+
+    enableDeveloperMode() {
+        const footer = document.querySelector('.docen-sidebar-footer');
+        if (!footer || document.getElementById('dev-mode-btn')) return;
+
+        const devBtn = document.createElement('button');
+        devBtn.id = 'dev-mode-btn';
+        devBtn.className = 'theme-toggle-btn';
+        devBtn.title = 'Developer Options (Icons)';
+        devBtn.innerHTML = '<i data-lucide="wrench"></i>';
+        
+        devBtn.addEventListener('click', () => this.showIconViewer());
+
+        footer.appendChild(devBtn);
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+    }
+
+    showIconViewer() {
+        let modal = document.getElementById('icon-viewer-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'icon-viewer-modal';
+            modal.className = 'docen-modal-overlay';
+            
+            const modalContent = document.createElement('div');
+            modalContent.className = 'docen-modal-content';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'docen-modal-close';
+            closeBtn.innerHTML = '<i data-lucide="x"></i>';
+            closeBtn.onclick = () => modal.classList.remove('active');
+
+            const title = document.createElement('h2');
+            title.textContent = 'Lucide Icons Reference';
+
+            const warningText = document.createElement('div');
+            warningText.className = 'docen-modal-warning';
+            warningText.innerHTML = '<i data-lucide="info"></i> <span>You can disable this developer tool by setting <code>developerMode: false</code> in your <code>config.js</code> file.</span>';
+
+            const searchBar = document.createElement('input');
+            searchBar.type = 'text';
+            searchBar.placeholder = 'Search icons...';
+            searchBar.className = 'docen-icon-search';
+
+            const grid = document.createElement('div');
+            grid.className = 'docen-icon-grid';
+            
+            searchBar.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                const items = grid.querySelectorAll('.docen-icon-item');
+                items.forEach(item => {
+                    const iconName = item.querySelector('span').textContent.toLowerCase();
+                    if (iconName.includes(query)) {
+                        item.style.display = 'flex';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+
+            if (typeof lucide !== 'undefined') {
+                const icons = Object.keys(lucide.icons);
+                icons.forEach(icon => {
+                    const item = document.createElement('div');
+                    item.className = 'docen-icon-item';
+                    item.innerHTML = `
+                        <i data-lucide="${icon}"></i>
+                        <span>${icon}</span>
+                    `;
+                    item.onclick = () => {
+                        navigator.clipboard.writeText(icon);
+                        alert(`Copied "${icon}" to clipboard!`);
+                    };
+                    grid.appendChild(item);
+                });
+            }
+
+            modalContent.appendChild(closeBtn);
+            modalContent.appendChild(title);
+            modalContent.appendChild(warningText);
+            modalContent.appendChild(searchBar);
+            modalContent.appendChild(grid);
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+        
+        modal.classList.add('active');
     }
 
     initTheme() {
@@ -163,7 +258,7 @@ class Docen {
     buildNav() {
         this.navElement.innerHTML = '';
         const ul = document.createElement('ul');
-        this.appendNavItems(docenConfig.nav, ul);
+        this.appendNavItems(docenConfig.nav, ul, true);
         this.navElement.appendChild(ul);
         
         if (typeof lucide !== 'undefined') {
@@ -171,9 +266,27 @@ class Docen {
         }
     }
 
-    appendNavItems(items, parentElement) {
+    appendNavItems(items, parentElement, isRoot = false) {
+        // Read global icon preferences from config with safe fallback defaults
+        const useIcons = docenConfig.icons !== false;
+        const useDefaultIcons = docenConfig.showDefaultIcons !== false;
+
         items.forEach(item => {
             const li = document.createElement('li');
+            
+            // Icon handling to determine if we should generate an icon element
+            let iconHtml = '';
+            if (useIcons && isRoot) {
+                if (item.icon) {
+                    iconHtml = `<i data-lucide="${item.icon.toLowerCase()}" class="nav-item-icon"></i>`;
+                } else if (useDefaultIcons) {
+                    if (item.folder) {
+                        iconHtml = `<i data-lucide="folder" class="nav-item-icon"></i>`;
+                    } else {
+                        iconHtml = `<i data-lucide="file-text" class="nav-item-icon"></i>`;
+                    }
+                }
+            }
             
             if (item.folder) {
                 const folderDiv = document.createElement('div');
@@ -187,7 +300,7 @@ class Docen {
                 }
                 
                 folderLink.className = 'folder-link';
-                folderLink.innerHTML = `<span>${item.folder}</span><i data-lucide="chevron-right" class="folder-icon"></i>`;
+                folderLink.innerHTML = `<div class="nav-link-content">${iconHtml}<span>${item.folder}</span></div><i data-lucide="chevron-right" class="folder-icon"></i>`;
                 
                 if (!item.file) {
                     folderLink.addEventListener('click', (e) => {
@@ -206,13 +319,14 @@ class Docen {
                 if (item.children && item.children.length > 0) {
                     const childUl = document.createElement('ul');
                     childUl.className = 'folder-children';
-                    this.appendNavItems(item.children, childUl);
+                    this.appendNavItems(item.children, childUl, false);
                     li.appendChild(childUl);
                 }
             } else {
                 const a = document.createElement('a');
-                a.textContent = item.title;
+                a.className = 'item-link';
                 a.href = `#${item.file}`;
+                a.innerHTML = `<div class="nav-link-content">${iconHtml}<span>${item.title}</span></div>`;
                 li.appendChild(a);
             }
             

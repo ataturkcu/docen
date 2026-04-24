@@ -181,7 +181,136 @@ body {
     text-overflow: ellipsis;
 }
 
-/* Flash Animation for Search Jumping */
+/* Developer Mode Modal */
+.docen-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.docen-modal-overlay.active {
+    display: flex;
+}
+
+.docen-modal-content {
+    background: var(--docen-bg);
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding: var(--docen-spacing);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
+
+.docen-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: var(--docen-text);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.docen-modal-close:hover {
+    opacity: 1;
+}
+
+.docen-modal-content h2 {
+    margin-bottom: 8px;
+    font-size: 1.5rem;
+}
+
+.docen-modal-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85em;
+    color: var(--docen-text);
+    opacity: 0.8;
+    margin-bottom: 24px;
+    padding: 8px 12px;
+    background-color: var(--docen-sidebar-bg);
+    border-left: 3px solid var(--docen-accent);
+    border-radius: var(--docen-radius);
+}
+
+.docen-modal-warning i {
+    width: 16px;
+    height: 16px;
+    color: var(--docen-accent);
+}
+
+.docen-modal-warning code {
+    font-family: var(--docen-font-code);
+    background-color: var(--docen-bg);
+    padding: 2px 4px;
+    border-radius: 2px;
+    border: 1px solid var(--docen-sidebar-border);
+}
+
+.docen-icon-search {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 24px;
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    background-color: var(--docen-bg);
+    color: var(--docen-text);
+    font-family: inherit;
+    font-size: 1em;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.docen-icon-search:focus {
+    border-color: var(--docen-accent);
+}
+
+.docen-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 16px;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+.docen-icon-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    background: var(--docen-sidebar-bg);
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    cursor: pointer;
+    font-size: 0.8em;
+    text-align: center;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.docen-icon-item:hover {
+    background: var(--docen-bg);
+    border-color: var(--docen-accent);
+    color: var(--docen-accent);
+}
+
+.docen-icon-item span {
+    word-break: break-all;
+}
 .docen-flash {
     background-color: transparent;
     color: inherit;
@@ -200,7 +329,7 @@ body {
     list-style: none;
 }
 
-.docen-sidebar nav a, .docen-sidebar nav .folder-link {
+.docen-sidebar nav a, .docen-sidebar nav .folder-link, .docen-sidebar nav .item-link {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -212,8 +341,21 @@ body {
     cursor: pointer;
 }
 
+.nav-link-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.nav-item-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+}
+
 .docen-sidebar nav a:hover,
 .docen-sidebar nav .folder-link:hover,
+.docen-sidebar nav .item-link:hover,
 .docen-sidebar nav a.active {
     background-color: rgba(3, 102, 214, 0.1);
     color: var(--docen-accent);
