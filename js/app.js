@@ -189,10 +189,23 @@ class Docen {
                 folderLink.className = 'folder-link';
                 folderLink.innerHTML = `<span>${item.folder}</span><i data-lucide="chevron-right" class="folder-icon"></i>`;
                 
+                if (!item.file) {
+                    folderLink.addEventListener('click', (e) => {
+                        const childUl = li.querySelector(':scope > ul.folder-children');
+                        const icon = folderLink.querySelector('.folder-icon');
+                        if (childUl) {
+                            childUl.classList.toggle('open');
+                            if (icon) icon.classList.toggle('open');
+                        }
+                        e.preventDefault();
+                    });
+                }
+                
                 li.appendChild(folderLink);
                 
                 if (item.children && item.children.length > 0) {
                     const childUl = document.createElement('ul');
+                    childUl.className = 'folder-children';
                     this.appendNavItems(item.children, childUl);
                     li.appendChild(childUl);
                 }
@@ -209,12 +222,34 @@ class Docen {
 
     updateNavState(currentFile) {
         const links = this.navElement.querySelectorAll('a');
+        let activeLinkElement = null;
+
         links.forEach(link => {
             link.classList.remove('active');
+            
             if (link.getAttribute('href') === `#${currentFile}`) {
                 link.classList.add('active');
+                activeLinkElement = link;
             }
         });
+
+        const allChildrenLists = this.navElement.querySelectorAll('ul.folder-children');
+        const allIcons = this.navElement.querySelectorAll('.folder-icon');
+        allChildrenLists.forEach(ul => ul.classList.remove('open'));
+        allIcons.forEach(icon => icon.classList.remove('open'));
+
+        if (activeLinkElement) {
+            let parent = activeLinkElement.parentElement;
+            while (parent && parent !== this.navElement) {
+                if (parent.tagName === 'LI') {
+                    const childUl = parent.querySelector(':scope > ul.folder-children');
+                    const icon = parent.querySelector(':scope > .folder-link .folder-icon');
+                    if (childUl) childUl.classList.add('open');
+                    if (icon) icon.classList.add('open');
+                }
+                parent = parent.parentElement;
+            }
+        }
     }
 
     async handleRoute() {

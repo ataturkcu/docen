@@ -219,15 +219,25 @@ body {
     color: var(--docen-accent);
 }
 
-.docen-sidebar nav ul ul {
-    padding-left: 16px; 
+.docen-sidebar nav ul ul.folder-children {
+    display: none;
+    padding-left: 16px; /* Indent nested lists */
     margin-top: 4px;
+}
+
+.docen-sidebar nav ul ul.folder-children.open {
+    display: block;
 }
 
 .folder-icon {
     width: 16px;
     height: 16px;
     opacity: 0.6;
+    transition: transform 0.2s ease;
+}
+
+.folder-icon.open {
+    transform: rotate(90deg);
 }
 
 .docen-sidebar-footer {
