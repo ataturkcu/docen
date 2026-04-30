@@ -8,7 +8,7 @@ export const docenConfig = {
     showDefaultIcons: true, // Use automatic fallback icons if an item doesn't explicitly define 'icon'
     
     // Developer options
-    developerMode: true, // Set to true to show the icon reference tool in the footer
+    developerMode: true,
     // If you don't want to see the developer mode icon or if you are planning to release you can set this to false.
     
     // Sidebar navigation mapping

@@ -5,13 +5,13 @@
     --docen-sidebar-border: #e9ecef;
     --docen-accent: #0366d6;
     --docen-accent-hover: #0056b3;
-    
+
     --docen-font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --docen-font-code: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    
+
     --docen-radius: 4px;
     --docen-spacing: 24px;
-    
+
     --docen-scrollbar-thumb: #ced4da;
     --docen-scrollbar-track: #f8f9fa;
 }
@@ -23,7 +23,7 @@
     --docen-sidebar-border: #333333;
     --docen-accent: #4daafc;
     --docen-accent-hover: #2b8ee4;
-    
+
     --docen-scrollbar-thumb: #555555;
     --docen-scrollbar-track: #252526;
 }
@@ -69,54 +69,118 @@ body {
     min-height: 100vh;
 }
 
+.docen-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 900;
+}
+
+.docen-sidebar-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.docen-mobile-menu-btn {
+    display: none;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 1100;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    background-color: var(--docen-bg);
+    color: var(--docen-text);
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
 .docen-sidebar {
     width: 250px;
     background-color: var(--docen-sidebar-bg);
     border-right: 1px solid var(--docen-sidebar-border);
     padding: var(--docen-spacing);
     flex-shrink: 0;
-    
+
     position: sticky;
     top: 0;
     height: 100vh;
-    overflow-y: auto;
-    
+    overflow: visible;
+    z-index: 100;
+
     display: flex;
     flex-direction: column;
 }
 
-#docen-nav {
-    flex-grow: 1;
-    overflow-y: auto;
+.sidebar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    height: 40px;
+    position: relative;
+}
+
+.docen-logo {
+    flex: 1;
+    min-width: 0;
 }
 
 .docen-logo h2 {
     font-size: 1.5rem;
-    margin-bottom: 12px;
     font-weight: 600;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* Search Engine */
+#sidebar-toggle {
+    display: none;
+}
+
+#docen-nav {
+    flex-grow: 1;
+    overflow: visible;
+}
+
+.docen-logo h2 {
+    margin-bottom: 12px;
+}
+
+/* Search Engine Base */
 .docen-search {
     position: relative;
     margin-bottom: var(--docen-spacing);
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    background-color: var(--docen-bg);
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.docen-search.active {
+    border-color: var(--docen-accent);
 }
 
 .docen-search input {
     width: 100%;
     padding: 8px 12px 8px 32px;
-    border: 1px solid var(--docen-sidebar-border);
-    border-radius: var(--docen-radius);
-    background-color: var(--docen-bg);
+    border: none;
+    background: transparent;
     color: var(--docen-text);
     font-family: inherit;
     font-size: 0.9em;
     outline: none;
-    transition: border-color 0.2s;
-}
-
-.docen-search input:focus {
-    border-color: var(--docen-accent);
 }
 
 .docen-search .search-icon {
@@ -128,6 +192,8 @@ body {
     height: 16px;
     color: var(--docen-text);
     opacity: 0.5;
+    cursor: pointer;
+    z-index: 2;
 }
 
 .docen-search-results {
@@ -339,6 +405,7 @@ body {
     border-radius: var(--docen-radius);
     margin-bottom: 4px;
     cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .nav-link-content {
@@ -348,9 +415,10 @@ body {
 }
 
 .nav-item-icon {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     opacity: 0.7;
+    flex-shrink: 0;
 }
 
 .docen-sidebar nav a:hover,
@@ -359,6 +427,12 @@ body {
 .docen-sidebar nav a.active {
     background-color: rgba(3, 102, 214, 0.1);
     color: var(--docen-accent);
+}
+
+.docen-sidebar nav a:hover,
+.docen-sidebar nav .folder-link:hover,
+.docen-sidebar nav .item-link:hover {
+    transform: translateX(2px);
 }
 
 .docen-sidebar nav ul ul.folder-children {
@@ -383,11 +457,12 @@ body {
 }
 
 .docen-sidebar-footer {
-    margin-top: auto; 
+    margin-top: auto;
     padding-top: var(--docen-spacing);
     border-top: 1px solid var(--docen-sidebar-border);
     display: flex;
     gap: 8px;
+    align-items: center;
 }
 
 .theme-toggle-btn, .github-btn {
@@ -502,4 +577,52 @@ body {
 #docen-render-area th, #docen-render-area td {
     border: 1px solid var(--docen-sidebar-border);
     padding: 8px 12px;
+}
+
+@media (max-width: 900px) {
+    body.sidebar-open {
+        overflow: hidden;
+    }
+
+    body.sidebar-open .docen-mobile-menu-btn {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    .docen-container {
+        display: block;
+    }
+
+    .docen-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(320px, 85vw);
+        height: 100vh;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        z-index: 1000;
+        border-right: 1px solid var(--docen-sidebar-border);
+        overflow-y: auto;
+        overflow-x: visible;
+    }
+
+    #sidebar-toggle {
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    .docen-sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    .docen-mobile-menu-btn {
+        display: inline-flex;
+    }
+
+    .docen-content {
+        max-width: 100%;
+        padding: 72px 16px 24px;
+    }
 }

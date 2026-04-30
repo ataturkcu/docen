@@ -4,10 +4,14 @@ class Docen {
     constructor() {
         this.navElement = document.getElementById('docen-nav');
         this.renderElement = document.getElementById('docen-render-area');
+        this.sidebarElement = document.querySelector('.docen-sidebar');
+        this.sidebarBackdrop = document.getElementById('docen-sidebar-backdrop');
         this.searchIndex = null;
         this.init();
         this.initTheme();
         this.initSearch();
+
+        this.initSidebarControls();
         
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -17,6 +21,69 @@ class Docen {
         if (docenConfig.developerMode) {
             this.enableDeveloperMode();
         }
+    }
+
+    isMobileView() {
+        return window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    openMobileSidebar() {
+        if (!this.sidebarElement) return;
+        this.sidebarElement.classList.add('mobile-open');
+        if (this.sidebarBackdrop) this.sidebarBackdrop.classList.add('active');
+        document.body.classList.add('sidebar-open');
+    }
+
+    closeMobileSidebar() {
+        if (!this.sidebarElement) return;
+        this.sidebarElement.classList.remove('mobile-open');
+        if (this.sidebarBackdrop) this.sidebarBackdrop.classList.remove('active');
+        document.body.classList.remove('sidebar-open');
+    }
+
+    initSidebarControls() {
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const mobileToggle = document.getElementById('mobile-menu-toggle');
+
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => {
+                this.closeMobileSidebar();
+            });
+        }
+
+        if (mobileToggle) {
+            mobileToggle.addEventListener('click', () => {
+                if (!this.sidebarElement) return;
+                if (this.sidebarElement.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                } else {
+                    this.openMobileSidebar();
+                }
+            });
+        }
+
+        if (this.sidebarBackdrop) {
+            this.sidebarBackdrop.addEventListener('click', () => this.closeMobileSidebar());
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this.closeMobileSidebar();
+        });
+
+        if (this.navElement) {
+            this.navElement.addEventListener('click', (e) => {
+                if (e.target.closest('a') && this.isMobileView()) {
+                    this.closeMobileSidebar();
+                }
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            if (!this.sidebarElement) return;
+            if (!this.isMobileView()) {
+                this.closeMobileSidebar();
+            }
+        });
     }
 
     enableDeveloperMode() {
@@ -382,6 +449,7 @@ class Docen {
 
         this.updateNavState(filename);
         await this.loadContent(filename, searchQuery);
+        if (this.isMobileView()) this.closeMobileSidebar();
     }
 
     async loadContent(filename, searchQuery = null) {
