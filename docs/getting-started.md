@@ -25,7 +25,22 @@ export const docenConfig = {
     // ...
     nav: [
         { title: "Introduction", file: "index.md" },
-        { title: "Getting Started", file: "getting-started.md" }
+        { title: "Getting Started", file: "getting-started.md" },
+        {
+            folder: "Advanced",
+            file: "Advanced/index.md",
+            children: [
+                { title: "Configuration", file: "Advanced/configuration.md" },
+                { title: "Theming", file: "Advanced/theming.md" }
+            ]
+        }
     ]
 }
 ```
+
+## 3. Keyboard Shortcuts
+
+- `/` focus search
+- `n` next page
+- `p` previous page
+- `Esc` close open menus/modals

@@ -7,13 +7,19 @@ class Docen {
         this.sidebarElement = document.querySelector('.docen-sidebar');
         this.sidebarBackdrop = document.getElementById('docen-sidebar-backdrop');
         this.tocObserver = null;
-        this.searchIndex = null;
+        this.currentFile = null;
+        this.pageSequence = this.getPageSequence();
+        this.documentCache = new Map();
+        this.searchIndex = new Map();
+        this.searchPriorityIndexPromise = null;
+        this.searchBackgroundIndexPromise = null;
         this.init();
         this.initTheme();
         this.initSearch();
 
         this.initSidebarControls();
-        
+        this.initKeyboardShortcuts();
+
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
@@ -117,7 +123,7 @@ class Docen {
         devBtn.className = 'theme-toggle-btn';
         devBtn.title = 'Developer Options (Icons)';
         devBtn.innerHTML = '<i data-lucide="wrench"></i>';
-        
+
         devBtn.addEventListener('click', () => this.showIconViewer());
 
         footer.appendChild(devBtn);
@@ -130,10 +136,10 @@ class Docen {
             modal = document.createElement('div');
             modal.id = 'icon-viewer-modal';
             modal.className = 'docen-modal-overlay';
-            
+
             const modalContent = document.createElement('div');
             modalContent.className = 'docen-modal-content';
-            
+
             const closeBtn = document.createElement('button');
             closeBtn.className = 'docen-modal-close';
             closeBtn.innerHTML = '<i data-lucide="x"></i>';
@@ -153,7 +159,7 @@ class Docen {
 
             const grid = document.createElement('div');
             grid.className = 'docen-icon-grid';
-            
+
             searchBar.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase();
                 const items = grid.querySelectorAll('.docen-icon-item');
@@ -194,14 +200,14 @@ class Docen {
 
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
-        
+
         modal.classList.add('active');
     }
 
     initTheme() {
         const toggleBtn = document.getElementById('theme-toggle');
         const currentTheme = localStorage.getItem('docen-theme') || 'light';
-        
+
         this.applyTheme(currentTheme);
 
         if (toggleBtn) {
@@ -215,7 +221,7 @@ class Docen {
     applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
         localStorage.setItem('docen-theme', theme);
-        
+
         const toggleBtn = document.getElementById('theme-toggle');
         if (toggleBtn && typeof lucide !== 'undefined') {
             const iconName = theme === 'dark' ? 'sun' : 'moon';
@@ -227,23 +233,59 @@ class Docen {
     initSearch() {
         const searchInput = document.getElementById('docen-search-input');
         const searchResults = document.getElementById('docen-search-results');
-        
+
         if (!searchInput || !searchResults) return;
 
-        const filesToFetch = [];
-        const extractFiles = (items) => {
-            items.forEach(item => {
-                if (item.file) {
-                    filesToFetch.push({ title: item.title || item.folder, file: item.file });
-                }
-                if (item.children) {
-                    extractFiles(item.children);
-                }
-            });
+        const indexFile = async (info) => {
+            const key = info.file.toLowerCase();
+            if (this.searchIndex.has(key)) return;
+            try {
+                const content = await this.getDocumentText(info.file);
+                const textContent = this.extractSearchText(content);
+                this.searchIndex.set(key, {
+                    ...info,
+                    searchableContent: textContent.toLowerCase(),
+                    rawText: textContent
+                });
+            } catch (error) {
+                console.warn(`Could not index ${info.file}`);
+            }
         };
-        extractFiles(docenConfig.nav);
 
-        let buildPromise = null;
+        const getPriorityFiles = () => {
+            const files = this.pageSequence;
+            if (!this.currentFile || files.length === 0) {
+                return files.slice(0, 6);
+            }
+
+            const currentIndex = files.findIndex((item) => item.file.toLowerCase() === this.currentFile.toLowerCase());
+            if (currentIndex < 0) return files.slice(0, 6);
+
+            const orderedIndexes = [currentIndex, currentIndex + 1, currentIndex - 1, currentIndex + 2, currentIndex - 2]
+                .filter((index, pos, arr) => index >= 0 && index < files.length && arr.indexOf(index) === pos);
+            return orderedIndexes.map((index) => files[index]);
+        };
+
+        const ensurePriorityIndex = async () => {
+            if (!this.searchPriorityIndexPromise) {
+                this.searchPriorityIndexPromise = (async () => {
+                    const priorityFiles = getPriorityFiles();
+                    for (const info of priorityFiles) {
+                        await indexFile(info);
+                    }
+                })();
+            }
+            await this.searchPriorityIndexPromise;
+        };
+
+        const startBackgroundIndex = () => {
+            if (this.searchBackgroundIndexPromise) return;
+            this.searchBackgroundIndexPromise = (async () => {
+                for (const info of this.pageSequence) {
+                    await indexFile(info);
+                }
+            })();
+        };
 
         const handleSearch = async (e) => {
             const query = e.target.value.toLowerCase().trim();
@@ -252,42 +294,18 @@ class Docen {
                 return;
             }
 
-            if (!this.searchIndex) {
-                if (!buildPromise) {
-                    searchResults.innerHTML = '<div class="search-result-item" style="opacity: 0.5;">Indexing pages...</div>';
-                    searchResults.classList.add('active');
-                    
-                    buildPromise = (async () => {
-                        this.searchIndex = [];
-                        for (const info of filesToFetch) {
-                            try {
-                                const res = await fetch(`${docenConfig.baseDir}${info.file}`);
-                                if (res.ok) {
-                                    const content = await res.text();
-                                    
-                                    // Parse markdown and strip HTML for pure text indexing
-                                    const rawHtml = typeof marked !== 'undefined' ? marked.parse(content) : content;
-                                    const tmpDiv = document.createElement('div');
-                                    tmpDiv.innerHTML = rawHtml;
-                                    const textContent = (tmpDiv.textContent || tmpDiv.innerText || "").replace(/\s+/g, ' ');
-                                    
-                                    this.searchIndex.push({ 
-                                        ...info, 
-                                        searchableContent: textContent.toLowerCase(),
-                                        rawText: textContent
-                                    });
-                                }
-                            } catch (error) { console.warn(`Could not index ${info.file}`); }
-                        }
-                    })();
-                }
-                await buildPromise;
+            if (this.searchIndex.size === 0) {
+                searchResults.innerHTML = '<div class="search-result-item" style="opacity: 0.5;">Indexing pages...</div>';
+                searchResults.classList.add('active');
+                await ensurePriorityIndex();
             }
+            startBackgroundIndex();
 
-            if (!this.searchIndex) return;
+            const indexedPages = Array.from(this.searchIndex.values());
+            if (indexedPages.length === 0) return;
 
-            const results = this.searchIndex.filter(d => 
-                d.title.toLowerCase().includes(query) || 
+            const results = indexedPages.filter(d =>
+                d.title.toLowerCase().includes(query) ||
                 d.searchableContent.includes(query)
             );
 
@@ -312,7 +330,7 @@ class Docen {
                     </a>
                 `;
             }).join('');
-            
+
             searchResults.classList.add('active');
         };
 
@@ -329,6 +347,41 @@ class Docen {
                 searchResults.classList.add('active');
             }
         });
+    }
+
+    // keyboard shorcuts
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+            const typing = this.isTypingTarget(document.activeElement);
+
+            if (e.key === '/' && !typing) {
+                e.preventDefault();
+                const searchInput = document.getElementById('docen-search-input');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+
+            if ((e.key === 'n' || e.key === 'N') && !typing) {
+                e.preventDefault();
+                this.goRelativePage(1);
+                return;
+            }
+
+            if ((e.key === 'p' || e.key === 'P') && !typing) {
+                e.preventDefault();
+                this.goRelativePage(-1);
+            }
+        });
+    }
+
+    isTypingTarget(element) {
+        if (!element) return false;
+        const tag = element.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || element.isContentEditable;
     }
 
     init() {
@@ -349,7 +402,7 @@ class Docen {
         const ul = document.createElement('ul');
         this.appendNavItems(docenConfig.nav, ul, true);
         this.navElement.appendChild(ul);
-        
+
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
@@ -362,7 +415,7 @@ class Docen {
 
         items.forEach(item => {
             const li = document.createElement('li');
-            
+
             // Icon handling to determine if we should generate an icon element
             let iconHtml = '';
             if (useIcons && isRoot) {
@@ -376,10 +429,10 @@ class Docen {
                     }
                 }
             }
-            
+
             if (item.folder) {
                 const folderDiv = document.createElement('div');
-                
+
                 let folderLink;
                 if (item.file) {
                     folderLink = document.createElement('a');
@@ -387,10 +440,10 @@ class Docen {
                 } else {
                     folderLink = document.createElement('span');
                 }
-                
+
                 folderLink.className = 'folder-link';
                 folderLink.innerHTML = `<div class="nav-link-content">${iconHtml}<span>${item.folder}</span></div><i data-lucide="chevron-right" class="folder-icon"></i>`;
-                
+
                 if (!item.file) {
                     folderLink.addEventListener('click', (e) => {
                         const childUl = li.querySelector(':scope > ul.folder-children');
@@ -402,9 +455,9 @@ class Docen {
                         e.preventDefault();
                     });
                 }
-                
+
                 li.appendChild(folderLink);
-                
+
                 if (item.children && item.children.length > 0) {
                     const childUl = document.createElement('ul');
                     childUl.className = 'folder-children';
@@ -418,9 +471,24 @@ class Docen {
                 a.innerHTML = `<div class="nav-link-content">${iconHtml}<span>${item.title}</span></div>`;
                 li.appendChild(a);
             }
-            
+
             parentElement.appendChild(li);
         });
+    }
+
+    getPageSequence(items = docenConfig.nav, pages = []) {
+        items.forEach((item) => {
+            if (item.file) {
+                pages.push({
+                    file: item.file,
+                    title: item.title || item.folder || item.file
+                });
+            }
+            if (item.children && item.children.length > 0) {
+                this.getPageSequence(item.children, pages);
+            }
+        });
+        return pages;
     }
 
     updateNavState(currentFile) {
@@ -429,7 +497,7 @@ class Docen {
 
         links.forEach(link => {
             link.classList.remove('active');
-            
+
             if (link.getAttribute('href') === `#${currentFile}`) {
                 link.classList.add('active');
                 activeLinkElement = link;
@@ -461,7 +529,7 @@ class Docen {
 
         let filename = hash;
         let searchQuery = null;
-        
+
         if (hash.includes('?')) {
             const parts = hash.split('?');
             filename = parts[0];
@@ -469,6 +537,7 @@ class Docen {
             searchQuery = params.get('search');
         }
 
+        this.currentFile = filename;
         this.updateNavState(filename);
         await this.loadContent(filename, searchQuery);
         if (this.isMobileView()) this.closeMobileSidebar();
@@ -477,27 +546,41 @@ class Docen {
     async loadContent(filename, searchQuery = null) {
         this.renderElement.innerHTML = '<p>Loading...</p>';
         try {
-            const response = await fetch(`${docenConfig.baseDir}${filename}`);
-            if (!response.ok) {
-                throw new Error(`Failed to load ${filename}`);
-            }
-            const markdown = await response.text();
-            this.renderDocument(markdown, searchQuery);
+            const markdown = await this.getDocumentText(filename);
+            this.renderDocument(markdown, searchQuery, filename);
         } catch (error) {
             this.renderElement.innerHTML = `<h1>Page Not Found</h1><p>The document <code>${filename}</code> could not be loaded.</p>`;
             console.error(error);
         }
     }
 
-    renderDocument(markdown, searchQuery = null) {
+    async getDocumentText(filename) {
+        const key = filename.toLowerCase();
+        if (this.documentCache.has(key)) {
+            return this.documentCache.get(key);
+        }
+
+        const response = await fetch(`${docenConfig.baseDir}${filename}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load ${filename}`);
+        }
+
+        const markdown = await response.text();
+        this.documentCache.set(key, markdown);
+        return markdown;
+    }
+
+    renderDocument(markdown, searchQuery = null, currentFile = null) {
         this.destroyTocObserver();
         this.closeMobileTocModal();
 
         if (typeof marked !== 'undefined') {
-            this.renderElement.innerHTML = marked.parse(markdown);
+            const renderedHtml = marked.parse(markdown);
+            this.renderElement.innerHTML = this.sanitizeHtml(renderedHtml);
             this.wrapPageContent();
             this.buildPageToc();
-            
+            this.buildPageNavigation(currentFile);
+
             // Execute highlight and scroll logic if routed from search
             if (searchQuery) {
                 setTimeout(() => this.highlightAndScroll(searchQuery), 50);
@@ -505,6 +588,21 @@ class Docen {
         } else {
             this.renderElement.innerHTML = '<p>Error: Markdown parser not loaded.</p>';
         }
+    }
+
+    sanitizeHtml(html) {
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(html);
+        }
+        return html;
+    }
+
+    extractSearchText(markdown) {
+        const rawHtml = typeof marked !== 'undefined' ? marked.parse(markdown) : markdown;
+        const safeHtml = this.sanitizeHtml(rawHtml);
+        const tmpDiv = document.createElement('div');
+        tmpDiv.innerHTML = safeHtml;
+        return (tmpDiv.textContent || tmpDiv.innerText || '').replace(/\s+/g, ' ');
     }
 
     wrapPageContent() {
@@ -649,6 +747,61 @@ class Docen {
         headings.forEach((heading) => this.tocObserver.observe(heading));
     }
 
+    buildPageNavigation(currentFile) {
+        const contentWrapper = this.renderElement.querySelector('.docen-page-content');
+        if (!contentWrapper || !currentFile) return;
+
+        const pages = this.pageSequence;
+        const currentIndex = pages.findIndex((page) => page.file.toLowerCase() === currentFile.toLowerCase());
+        if (currentIndex < 0) return;
+
+        const previousPage = currentIndex > 0 ? pages[currentIndex - 1] : null;
+        const nextPage = currentIndex < pages.length - 1 ? pages[currentIndex + 1] : null;
+
+        if (!previousPage && !nextPage) return;
+
+        const nav = document.createElement('nav');
+        nav.className = 'docen-page-nav';
+        nav.setAttribute('aria-label', 'Page navigation');
+
+        const createLink = (page, direction) => {
+            const link = document.createElement('a');
+            link.className = `docen-page-nav-link ${direction}`;
+            link.href = `#${page.file}`;
+            link.innerHTML = direction === 'prev'
+                ? `<span class="docen-page-nav-top"><span class="docen-page-nav-label">Previous</span><kbd class="docen-keycap">P</kbd></span><span class="docen-page-nav-title">${page.title}</span>`
+                : `<span class="docen-page-nav-top"><span class="docen-page-nav-label">Next</span><kbd class="docen-keycap">N</kbd></span><span class="docen-page-nav-title">${page.title}</span>`;
+            return link;
+        };
+
+        if (previousPage) {
+            nav.appendChild(createLink(previousPage, 'prev'));
+        } else {
+            const spacer = document.createElement('span');
+            spacer.className = 'docen-page-nav-spacer';
+            nav.appendChild(spacer);
+        }
+
+        if (nextPage) {
+            nav.appendChild(createLink(nextPage, 'next'));
+        }
+
+        contentWrapper.appendChild(nav);
+    }
+
+    goRelativePage(offset) {
+        const pages = this.pageSequence;
+        if (!this.currentFile || pages.length === 0) return;
+
+        const currentIndex = pages.findIndex((page) => page.file.toLowerCase() === this.currentFile.toLowerCase());
+        if (currentIndex < 0) return;
+
+        const targetIndex = currentIndex + offset;
+        if (targetIndex < 0 || targetIndex >= pages.length) return;
+
+        window.location.hash = `#${pages[targetIndex].file}`;
+    }
+
     flashSection(heading) {
         heading.classList.remove('docen-section-flash');
         void heading.offsetWidth;
@@ -664,7 +817,7 @@ class Docen {
         const walker = document.createTreeWalker(contentRoot, NodeFilter.SHOW_TEXT, null, false);
         let node;
         const nodesToReplace = [];
-        
+
         while (node = walker.nextNode()) {
             if (node.parentNode.tagName !== 'SCRIPT' && node.nodeValue.toLowerCase().includes(query.toLowerCase())) {
                 nodesToReplace.push(node);
@@ -674,7 +827,7 @@ class Docen {
         nodesToReplace.forEach(node => {
             const parts = node.nodeValue.split(new RegExp(`(${query})`, 'i'));
             const fragment = document.createDocumentFragment();
-            
+
             parts.forEach(part => {
                 if (part.toLowerCase() === query.toLowerCase()) {
                     const mark = document.createElement('mark');

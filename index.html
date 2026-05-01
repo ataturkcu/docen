@@ -6,6 +6,7 @@
     <title>Docen - Minimal Docs Engine</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
@@ -23,6 +24,7 @@
             <div class="docen-search">
                 <i data-lucide="search" class="search-icon"></i>
                 <input type="text" id="docen-search-input" placeholder="Search docs..." autocomplete="off">
+                <kbd class="docen-search-shortcut">/</kbd>
                 <div id="docen-search-results" class="docen-search-results"></div>
             </div>
             <nav id="docen-nav"></nav>
