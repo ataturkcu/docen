@@ -6,6 +6,7 @@ class Docen {
         this.renderElement = document.getElementById('docen-render-area');
         this.sidebarElement = document.querySelector('.docen-sidebar');
         this.sidebarBackdrop = document.getElementById('docen-sidebar-backdrop');
+        this.tocObserver = null;
         this.searchIndex = null;
         this.init();
         this.initTheme();
@@ -41,6 +42,23 @@ class Docen {
         document.body.classList.remove('sidebar-open');
     }
 
+    closeMobileTocModal() {
+        const toc = this.renderElement?.querySelector('.docen-page-toc');
+        const backdrop = this.renderElement?.querySelector('.docen-page-toc-backdrop');
+        if (toc) toc.classList.remove('mobile-open');
+        if (backdrop) backdrop.classList.remove('active');
+        document.body.classList.remove('toc-modal-open');
+    }
+
+    openMobileTocModal() {
+        const toc = this.renderElement?.querySelector('.docen-page-toc');
+        const backdrop = this.renderElement?.querySelector('.docen-page-toc-backdrop');
+        if (!toc || !backdrop) return;
+        toc.classList.add('mobile-open');
+        backdrop.classList.add('active');
+        document.body.classList.add('toc-modal-open');
+    }
+
     initSidebarControls() {
         const sidebarToggle = document.getElementById('sidebar-toggle');
         const mobileToggle = document.getElementById('mobile-menu-toggle');
@@ -67,7 +85,10 @@ class Docen {
         }
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.closeMobileSidebar();
+            if (e.key === 'Escape') {
+                this.closeMobileSidebar();
+                this.closeMobileTocModal();
+            }
         });
 
         if (this.navElement) {
@@ -82,6 +103,7 @@ class Docen {
             if (!this.sidebarElement) return;
             if (!this.isMobileView()) {
                 this.closeMobileSidebar();
+                this.closeMobileTocModal();
             }
         });
     }
@@ -468,8 +490,13 @@ class Docen {
     }
 
     renderDocument(markdown, searchQuery = null) {
+        this.destroyTocObserver();
+        this.closeMobileTocModal();
+
         if (typeof marked !== 'undefined') {
             this.renderElement.innerHTML = marked.parse(markdown);
+            this.wrapPageContent();
+            this.buildPageToc();
             
             // Execute highlight and scroll logic if routed from search
             if (searchQuery) {
@@ -480,8 +507,161 @@ class Docen {
         }
     }
 
+    wrapPageContent() {
+        if (this.renderElement.querySelector('.docen-page-content')) return;
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'docen-page-content';
+
+        while (this.renderElement.firstChild) {
+            contentWrapper.appendChild(this.renderElement.firstChild);
+        }
+
+        this.renderElement.appendChild(contentWrapper);
+    }
+
+    destroyTocObserver() {
+        if (this.tocObserver) {
+            this.tocObserver.disconnect();
+            this.tocObserver = null;
+        }
+    }
+
+    slugify(text) {
+        return text
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+    }
+
+    buildPageToc() {
+        const contentWrapper = this.renderElement.querySelector('.docen-page-content');
+        if (!contentWrapper) return;
+
+        const headings = Array.from(contentWrapper.querySelectorAll('h2, h3'));
+        if (headings.length === 0) {
+            this.renderElement.classList.add('no-toc');
+            return;
+        }
+        this.renderElement.classList.remove('no-toc');
+
+        const seenIds = new Set();
+        headings.forEach((heading) => {
+            let baseId = heading.id || this.slugify(heading.textContent || 'section');
+            if (!baseId) baseId = 'section';
+
+            let candidate = baseId;
+            let suffix = 2;
+            while (seenIds.has(candidate) || (document.getElementById(candidate) && document.getElementById(candidate) !== heading)) {
+                candidate = `${baseId}-${suffix}`;
+                suffix += 1;
+            }
+
+            heading.id = candidate;
+            seenIds.add(candidate);
+        });
+
+        const toc = document.createElement('nav');
+        toc.className = 'docen-page-toc';
+        toc.setAttribute('aria-label', 'On this page');
+
+        const titleBar = document.createElement('div');
+        titleBar.className = 'docen-page-toc-titlebar';
+
+        const title = document.createElement('p');
+        title.className = 'docen-page-toc-title';
+        title.textContent = 'On this page';
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'docen-page-toc-close';
+        closeBtn.setAttribute('aria-label', 'Close table of contents');
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => this.closeMobileTocModal());
+
+        titleBar.appendChild(title);
+        titleBar.appendChild(closeBtn);
+        toc.appendChild(titleBar);
+
+        const list = document.createElement('ul');
+        const buttonMap = new Map();
+
+        headings.forEach((heading) => {
+            const item = document.createElement('li');
+            item.className = `docen-page-toc-item level-${heading.tagName.toLowerCase()}`;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = heading.textContent || '';
+            button.dataset.targetId = heading.id;
+            button.addEventListener('click', () => {
+                heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                this.flashSection(heading);
+                buttonMap.forEach((btn) => btn.classList.remove('active'));
+                button.classList.add('active');
+                if (this.isMobileView()) this.closeMobileTocModal();
+            });
+
+            buttonMap.set(heading.id, button);
+            item.appendChild(button);
+            list.appendChild(item);
+        });
+
+        toc.appendChild(list);
+        this.renderElement.appendChild(toc);
+
+        const mobileTrigger = document.createElement('button');
+        mobileTrigger.type = 'button';
+        mobileTrigger.className = 'docen-mobile-toc-trigger';
+        mobileTrigger.textContent = 'On this page';
+        mobileTrigger.addEventListener('click', () => this.openMobileTocModal());
+        this.renderElement.appendChild(mobileTrigger);
+
+        const mobileBackdrop = document.createElement('div');
+        mobileBackdrop.className = 'docen-page-toc-backdrop';
+        mobileBackdrop.addEventListener('click', () => this.closeMobileTocModal());
+        this.renderElement.appendChild(mobileBackdrop);
+
+        const setActiveButton = (headingId) => {
+            buttonMap.forEach((btn) => btn.classList.remove('active'));
+            const activeBtn = buttonMap.get(headingId);
+            if (activeBtn) activeBtn.classList.add('active');
+        };
+
+        setActiveButton(headings[0].id);
+
+        this.tocObserver = new IntersectionObserver((entries) => {
+            const visible = entries
+                .filter((entry) => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+            if (visible.length > 0) {
+                setActiveButton(visible[0].target.id);
+            }
+        }, {
+            root: null,
+            rootMargin: '-20% 0px -70% 0px',
+            threshold: [0.1, 0.4, 0.7]
+        });
+
+        headings.forEach((heading) => this.tocObserver.observe(heading));
+    }
+
+    flashSection(heading) {
+        heading.classList.remove('docen-section-flash');
+        void heading.offsetWidth;
+        heading.classList.add('docen-section-flash');
+
+        setTimeout(() => {
+            heading.classList.remove('docen-section-flash');
+        }, 1800);
+    }
+
     highlightAndScroll(query) {
-        const walker = document.createTreeWalker(this.renderElement, NodeFilter.SHOW_TEXT, null, false);
+        const contentRoot = this.renderElement.querySelector('.docen-page-content') || this.renderElement;
+        const walker = document.createTreeWalker(contentRoot, NodeFilter.SHOW_TEXT, null, false);
         let node;
         const nodesToReplace = [];
         
@@ -509,7 +689,7 @@ class Docen {
         });
 
         // Try to scroll to the first highlight smoothly
-        const firstMark = this.renderElement.querySelector('.docen-flash');
+        const firstMark = contentRoot.querySelector('.docen-flash');
         if (firstMark) {
             firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }

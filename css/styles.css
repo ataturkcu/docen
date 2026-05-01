@@ -506,9 +506,123 @@ body {
 
 .docen-content {
     flex-grow: 1;
+    width: 100%;
     padding: calc(var(--docen-spacing) * 2);
-    max-width: 800px;
-    margin: 0 auto;
+    max-width: 1100px;
+    margin: 0 auto 0 12px;
+}
+
+#docen-render-area {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 40px;
+    align-items: start;
+}
+
+#docen-render-area.no-toc {
+    display: block;
+}
+
+#docen-render-area .docen-page-content {
+    grid-column: 1;
+    min-width: 0;
+}
+
+#docen-render-area .docen-page-content > :first-child {
+    margin-top: 0;
+}
+
+#docen-render-area .docen-page-toc {
+    grid-column: 2;
+    position: sticky;
+    top: 24px;
+    border: 1px solid var(--docen-sidebar-border);
+    background: var(--docen-sidebar-bg);
+    border-radius: var(--docen-radius);
+    padding: 12px 14px;
+    margin-bottom: 0;
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+}
+
+#docen-render-area .docen-page-toc-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#docen-render-area .docen-page-toc-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin: 0 0 8px 0;
+}
+
+#docen-render-area .docen-page-toc-close {
+    display: none;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--docen-sidebar-border);
+    border-radius: var(--docen-radius);
+    background: transparent;
+    color: var(--docen-text);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#docen-render-area .docen-page-toc ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#docen-render-area .docen-page-toc-item {
+    margin: 0;
+}
+
+#docen-render-area .docen-page-toc-item button {
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    color: var(--docen-text);
+    padding: 6px 8px;
+    border-radius: var(--docen-radius);
+    cursor: pointer;
+    font: inherit;
+}
+
+#docen-render-area .docen-page-toc-item button:hover {
+    color: var(--docen-accent);
+    background: rgba(3, 102, 214, 0.1);
+}
+
+#docen-render-area .docen-page-toc-item button.active {
+    color: var(--docen-accent);
+    background: rgba(3, 102, 214, 0.14);
+}
+
+#docen-render-area .docen-page-toc-item.level-h3 button {
+    padding-left: 20px;
+    opacity: 0.9;
+}
+
+#docen-render-area .docen-section-flash {
+    animation: docenSectionFlash 1.8s ease-out;
+}
+
+.docen-mobile-toc-trigger {
+    display: none;
+}
+
+.docen-page-toc-backdrop {
+    display: none;
+}
+
+@keyframes docenSectionFlash {
+    0% { background-color: var(--docen-accent); color: #fff; }
+    100% { background-color: transparent; color: inherit; }
 }
 
 #docen-render-area h1,
@@ -624,5 +738,76 @@ body {
     .docen-content {
         max-width: 100%;
         padding: 72px 16px 24px;
+        margin: 0;
+    }
+
+    #docen-render-area {
+        display: block;
+    }
+
+    #docen-render-area .docen-page-toc {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+        z-index: 1300;
+        margin: 0;
+        max-height: min(70vh, 520px);
+        border-radius: 16px 16px 0 0;
+        transform: translateY(100%);
+        transition: transform 0.25s ease;
+    }
+
+    #docen-render-area .docen-page-toc.mobile-open {
+        transform: translateY(0);
+    }
+
+    #docen-render-area .docen-page-toc-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .docen-page-toc-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.2s ease, visibility 0.2s ease;
+        z-index: 1200;
+    }
+
+    .docen-page-toc-backdrop.active {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .docen-mobile-toc-trigger {
+        display: inline-flex;
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 1100;
+        padding: 10px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--docen-sidebar-border);
+        background: var(--docen-bg);
+        color: var(--docen-text);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    body.sidebar-open .docen-mobile-toc-trigger,
+    body.toc-modal-open .docen-mobile-toc-trigger {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+
+    body.toc-modal-open {
+        overflow: hidden;
     }
 }
