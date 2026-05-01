@@ -44,3 +44,7 @@ Main config is in `js/config.js`:
 - `showDefaultIcons`
 - `developerMode`
 - `nav`
+
+## Third-party notice
+
+- **Lucide Icons** is used for the UI icon set (`https://lucide.dev`), distributed under the **ISC License**.

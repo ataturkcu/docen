@@ -14,3 +14,7 @@ It uses pure HTML, CSS, and JavaScript.
 - **Page Navigation:** Previous/Next links at the bottom of each page.
 - **Theme Support:** Light and dark theme with saved preference.
 - **Keyboard Shortcuts:** `/`, `n`, `p`, `Esc`.
+
+## Notice
+
+Docen uses **Lucide Icons** (`https://lucide.dev`) for UI icons.
