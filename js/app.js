@@ -395,6 +395,7 @@ class Docen {
         this.handleRoute();
 
         window.addEventListener('hashchange', () => this.handleRoute());
+        this.renderElement.addEventListener('click', (event) => this.handleContentLinkClick(event));
     }
 
     buildNav() {
@@ -523,27 +524,42 @@ class Docen {
         }
     }
 
-    async handleRoute() {
-        let hash = window.location.hash.slice(1);
-        if (!hash) hash = docenConfig.homePage;
-
-        let filename = hash;
+    parseRoute(hash) {
+        let filename = hash || docenConfig.homePage;
         let searchQuery = null;
+        let section = null;
 
-        if (hash.includes('?')) {
-            const parts = hash.split('?');
+        if (filename.includes('?')) {
+            const parts = filename.split('?');
             filename = parts[0];
-            const params = new URLSearchParams('?' + parts[1]);
+            const params = new URLSearchParams('?' + parts.slice(1).join('?'));
             searchQuery = params.get('search');
+            section = params.get('section');
+        }
+
+        return { filename: filename || docenConfig.homePage, searchQuery, section };
+    }
+
+    async handleRoute() {
+        const { filename, searchQuery, section } = this.parseRoute(window.location.hash.slice(1));
+
+        // Same document, only the section changed: just scroll, don't reload
+        if (section && !searchQuery && this.renderedFile === filename && filename === this.currentFile) {
+            this.scrollToSection(section);
+            return;
         }
 
         this.currentFile = filename;
         this.updateNavState(filename);
         await this.loadContent(filename, searchQuery);
+        if (section) {
+            setTimeout(() => this.scrollToSection(section), 50);
+        }
         if (this.isMobileView()) this.closeMobileSidebar();
     }
 
     async loadContent(filename, searchQuery = null) {
+        this.renderedFile = null;
         this.renderElement.innerHTML = '<p>Loading...</p>';
         try {
             const markdown = await this.getDocumentText(filename);
@@ -578,8 +594,11 @@ class Docen {
             const renderedHtml = marked.parse(markdown);
             this.renderElement.innerHTML = this.sanitizeHtml(renderedHtml);
             this.wrapPageContent();
+            this.assignHeadingIds();
+            this.rewriteDocumentLinks(currentFile);
             this.buildPageToc();
             this.buildPageNavigation(currentFile);
+            this.renderedFile = currentFile;
 
             // Execute highlight and scroll logic if routed from search
             if (searchQuery) {
@@ -632,6 +651,125 @@ class Docen {
             .replace(/[^\w\s-]/g, '')
             .replace(/\s+/g, '-')
             .replace(/-+/g, '-');
+    }
+
+    assignHeadingIds() {
+        const contentWrapper = this.renderElement.querySelector('.docen-page-content');
+        if (!contentWrapper) return;
+
+        const seenIds = new Set();
+        contentWrapper.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach((heading) => {
+            const baseId = heading.id || this.slugify(heading.textContent || '') || 'section';
+
+            let candidate = baseId;
+            let suffix = 1;
+            while (seenIds.has(candidate)) {
+                candidate = `${baseId}-${suffix}`;
+                suffix += 1;
+            }
+
+            heading.id = candidate;
+            seenIds.add(candidate);
+        });
+    }
+
+    // Resolve a path written inside a document against that document's folder.
+    // Returns a path relative to docenConfig.baseDir (e.g. "Architecture/parser.md").
+    resolveDocPath(path, currentFile) {
+        const resolved = new URL(path, `https://docen.invalid/${currentFile || ''}`);
+        return decodeURIComponent(resolved.pathname.slice(1));
+    }
+
+    // Markdown links are written relative to the document, but the browser resolves them
+    // against index.html. Rewrite them into hash routes so they stay inside the app,
+    // wherever it is hosted (site root or a subfolder like /docen/).
+    rewriteDocumentLinks(currentFile) {
+        const contentWrapper = this.renderElement.querySelector('.docen-page-content');
+        if (!contentWrapper || !currentFile) return;
+
+        const isExternal = (value) => /^[a-z][a-z0-9+.-]*:/i.test(value) || value.startsWith('//');
+
+        contentWrapper.querySelectorAll('a[href]').forEach((link) => {
+            const href = link.getAttribute('href').trim();
+            if (!href || isExternal(href)) return;
+
+            if (href.startsWith('#')) {
+                const target = href.slice(1);
+                // Already a Docen route like "#Advanced/theming.md"
+                if (!target || /\.md(\?|$)/i.test(target)) return;
+                link.setAttribute('href', this.buildRouteHash(currentFile, this.safeDecode(target)));
+                return;
+            }
+
+            const [, path, suffix] = href.match(/^([^?#]*)(.*)$/);
+            const resolved = this.resolveDocPath(path, currentFile);
+
+            if (/\.md$/i.test(path)) {
+                const hashIndex = suffix.indexOf('#');
+                const section = hashIndex >= 0 ? this.safeDecode(suffix.slice(hashIndex + 1)) : null;
+                link.setAttribute('href', this.buildRouteHash(resolved, section));
+            } else {
+                // Other files next to the document (downloads, ...) live under baseDir
+                link.setAttribute('href', `${docenConfig.baseDir}${resolved}${suffix}`);
+            }
+        });
+
+        contentWrapper.querySelectorAll('img[src]').forEach((img) => {
+            const src = img.getAttribute('src').trim();
+            if (!src || isExternal(src)) return;
+            img.setAttribute('src', `${docenConfig.baseDir}${this.resolveDocPath(src, currentFile)}`);
+        });
+    }
+
+    buildRouteHash(file, section = null) {
+        return section ? `#${file}?section=${encodeURIComponent(section)}` : `#${file}`;
+    }
+
+    safeDecode(value) {
+        try {
+            return decodeURIComponent(value);
+        } catch {
+            return value;
+        }
+    }
+
+    findSectionElement(section) {
+        const contentRoot = this.renderElement.querySelector('.docen-page-content') || this.renderElement;
+        const candidates = [section, section.toLowerCase(), this.slugify(section)];
+        for (const id of candidates) {
+            if (!id) continue;
+            const byId = contentRoot.querySelector(`#${CSS.escape(id)}`);
+            if (byId) return byId;
+            const byName = contentRoot.querySelector(`a[name="${CSS.escape(id)}"]`);
+            if (byName) return byName;
+        }
+        return null;
+    }
+
+    scrollToSection(section) {
+        const target = this.findSectionElement(section);
+        if (!target) return;
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (/^H[1-6]$/.test(target.tagName)) this.flashSection(target);
+    }
+
+    // Links to a section of the current document: scroll without re-rendering,
+    // even when the same link is clicked twice (no hashchange fires then).
+    handleContentLinkClick(event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        const link = event.target.closest('.docen-page-content a[href^="#"]');
+        if (!link) return;
+
+        const { filename, searchQuery, section } = this.parseRoute(link.getAttribute('href').slice(1));
+        if (!section || searchQuery || filename !== this.currentFile || this.renderedFile !== filename) return;
+
+        event.preventDefault();
+        const newHash = link.getAttribute('href');
+        if (window.location.hash !== newHash) {
+            history.pushState(null, '', newHash);
+        }
+        this.scrollToSection(section);
     }
 
     buildPageToc() {
